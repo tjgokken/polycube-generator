@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Polycube Visualization</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background-color: #f0f0f0; 
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+        #controls {
+            width: 300px;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        #viewer {
+            flex-grow: 1;
+        }
+        .category {
+            margin: 15px 0;
+        }
+        .category-title {
+            font-weight: bold;
+            margin: 10px 0;
+            cursor: pointer;
+            padding: 5px;
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+        .category-shapes {
+            margin-left: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .shape-button {
+            display: block;
+            margin: 5px 0;
+            padding: 5px;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9em;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .shape-button:hover {
+            background: #f0f0f0;
+        }
+        .shape-info {
+            margin-top: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .current {
+            background-color: #ddd;
+        }
+        .matched {
+            background-color: #afa;
+        }
+        .filter-control {
+            margin: 10px 0;
+        }
+        #search-box {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .view-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 360px;
+            z-index: 100;
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            width: 220px;
+        }
+        .view-controls h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .view-controls button {
+            margin: 2px;
+            padding: 6px 10px;
+            width: 65px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .view-controls button:hover {
+            background: #e0e0e0;
+        }
+        .view-controls label {
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .view-controls input[type='range'] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .axis-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .reset-button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px !important;
+            background: #e8e8e8 !important;
+        }
+        .upload-section {
+            padding: 20px;
+            border: 2px dashed #ccc;
+            text-align: center;
+            background: #f9f9f9;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .upload-section.dragover {
+            background: #e6f7ff;
+            border-color: #1890ff;
+        }
+        #file-input {
+            display: none;
+        }
+        .upload-button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .loading-message {
+            display: none;
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+        }
+        .error-message {
+            color: #d9534f;
+            margin-top: 10px;
+        }
+        .success-message {
+            color: #5cb85c;
+            margin-top: 10px;
+        }
+        .color-controls {
+            margin-top: 15px;
+        }
+        #color-picker {
+            width: 30px;
+            height: 30px;
+            vertical-align: middle;
+        }
+        .color-label {
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        .stats-section {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+        .hide {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="controls">
+            <h2>Polycube Visualizer</h2>
+            
+            <div class="upload-section" id="drop-area">
+                <p>Upload a CSV file containing polycube data</p>
+                <p><small>Format: ID, Shape, DimensionX, DimensionY, DimensionZ</small></p>
+                <p><small>=>: SurfaceArea, Connectivity, CubeX, CubeY, CubeZ</small></p>
+                <input type="file" id="file-input" accept=".csv" />
+                <button class="upload-button" id="upload-button">Choose File</button>
+                <div class="loading-message" id="loading-message">Processing data, please wait...</div>
+                <div class="error-message" id="error-message"></div>
+                <div class="success-message" id="success-message"></div>
+            </div>
+            
+            <div class="filter-control hide" id="filter-section">
+                <input type="text" id="search-box" placeholder="Search shapes...">
+                <div>
+                    <label>Category: 
+                        <select id="category-filter">
+                            <option value="all">All Categories</option>
+                            <option value="Linear">1D (Linear)</option>
+                            <option value="Flat">2D (Planar)</option>
+                            <option value="3D">3D Shapes</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+            
+            <div id="shape-categories"></div>
+            
+            <div class="color-controls hide" id="color-section">
+                <label for="color-picker" class="color-label">Cube Color:</label>
+                <input type="color" id="color-picker" value="#ffd700">
+            </div>
+            
+            <div class="stats-section hide" id="stats-section">
+                <h3>Statistics</h3>
+                <div id="total-count"></div>
+                <div id="shape-distribution"></div>
+            </div>
+            
+            <div class="shape-info hide" id="comparison-section">
+                <h3>Comparison Tool</h3>
+                <p>Select shapes to compare:</p>
+                <div>
+                    <label for="shape1">Shape 1:</label>
+                    <select id="shape1"></select>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label for="shape2">Shape 2:</label>
+                    <select id="shape2"></select>
+                </div>
+                <button id="compare-btn" style="margin-top: 10px;">Compare Shapes</button>
+                <div id="comparison-result" style="margin-top: 10px;"></div>
+            </div>
+            
+            <div id="active-shape-info" class="shape-info hide">
+                <h3>Shape Details</h3>
+                <table id="shape-details">
+                    <tr><th>Property</th><th>Value</th></tr>
+                    <tr><td>Shape #</td><td id="detail-id">-</td></tr>
+                    <tr><td>Category</td><td id="detail-category">-</td></tr>
+                    <tr><td>Shape Type</td><td id="detail-type">-</td></tr>
+                    <tr><td>Dimensions</td><td id="detail-dimensions">-</td></tr>
+                    <tr><td>Surface Area</td><td id="detail-surface">-</td></tr>
+                    <tr><td>Connectivity</td><td id="detail-connectivity">-</td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div id="viewer">
+            <div class="view-controls hide" id="view-controls">
+                <h3>View Controls</h3>
+                <div class="axis-buttons">
+                    <button id="view-top">Top</button>
+                    <button id="view-front">Front</button>
+                    <button id="view-right">Right</button>
+                    <button id="view-bottom">Bottom</button>
+                    <button id="view-back">Back</button>
+                    <button id="view-left">Left</button>
+                </div>
+                <button id="view-iso" class="reset-button">Isometric</button>
+                <label for="rotation-speed">Rotation Speed:</label>
+                <input type="range" id="rotation-speed" min="0" max="10" value="0">
+                <label>
+                    <input type="checkbox" id="auto-rotate"> Auto-rotate
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        // Global variables
+        let scene, camera, renderer, controls;
+        let currentShape = null;
+        let autoRotate = false;
+        let rotationSpeed = 0;
+        let shapes = [];
+        let shapesByID = new Map();
+        let cubeColor = 0xffd700; // Default gold color
+        
+        function showLoading() {
+            document.getElementById('loading-message').style.display = 'block';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading-message').style.display = 'none';
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+        
+        function clearError() {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = '';
+            errorElement.style.display = 'none';
+        }
+        
+        function showSuccess(message) {
+            const successElement = document.getElementById('success-message');
+            successElement.textContent = message;
+            successElement.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                successElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        function filterShapes() {
+            const categoryFilter = document.getElementById('category-filter').value;
+            const searchText = document.getElementById('search-box').value.toLowerCase();
+            
+            // Show/hide categories based on filter
+            document.querySelectorAll('.category').forEach(category => {
+                const categoryShapeType = category.querySelector('.category-title').textContent.split(' ')[0];
+                
+                if (categoryFilter === 'all' || 
+                    (categoryFilter === 'Linear' && categoryShapeType === '1D') ||
+                    (categoryFilter === 'Flat' && categoryShapeType === '2D') ||
+                    (categoryFilter === '3D' && categoryShapeType === '3D')) {
+                    category.style.display = 'block';
+                } else {
+                    category.style.display = 'none';
+                }
+            });
+            
+            // Show/hide shapes based on search text
+            document.querySelectorAll('.shape-button').forEach(button => {
+                if (searchText === '' || button.textContent.toLowerCase().includes(searchText)) {
+                    button.style.display = 'block';
+                } else {
+                    button.style.display = 'none';
+                }
+            });
+        }
+        
+        function loadShape(index) {
+            // Clear previous shape
+            if (currentShape) scene.remove(currentShape);
+            currentShape = new THREE.Group();
+            
+            const shape = shapes[index];
+            
+            // Create cubes
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshPhongMaterial({ color: cubeColor });
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+            
+            shape.cubes.forEach(cube => {
+                const cubeMesh = new THREE.Mesh(geometry, material);
+                cubeMesh.position.set(cube.x, cube.y, cube.z);
+                currentShape.add(cubeMesh);
+                
+                // Add wireframe edges
+                const edges = new THREE.EdgesGeometry(geometry);
+                const line = new THREE.LineSegments(edges, edgeMaterial);
+                line.position.copy(cubeMesh.position);
+                currentShape.add(line);
+            });
+            
+            // Center the shape
+            const center = calculateCenter(shape.cubes);
+            currentShape.position.set(-center.x, -center.y, -center.z);
+            
+            // Reset rotation when loading a new shape
+            currentShape.rotation.set(0, 0, 0);
+            
+            // Add to scene
+            scene.add(currentShape);
+            
+            // Update shape info
+            document.getElementById('detail-id').textContent = shape.id;
+            document.getElementById('detail-category').textContent = getCategoryFullName(shape.shapeType);
+            document.getElementById('detail-type').textContent = shape.shapeType;
+            document.getElementById('detail-dimensions').textContent = shape.dimensions;
+            document.getElementById('detail-surface').textContent = shape.surfaceArea || 'N/A';
+            document.getElementById('detail-connectivity').textContent = shape.connectivity || 'N/A';
+        }
+        
+        function calculateCenter(cubes) {
+            let sumX = 0, sumY = 0, sumZ = 0;
+            cubes.forEach(cube => {
+                sumX += cube.x;
+                sumY += cube.y;
+                sumZ += cube.z;
+            });
+            return {
+                x: sumX / cubes.length,
+                y: sumY / cubes.length,
+                z: sumZ / cubes.length
+            };
+        }
+        
+        function compareShapes() {
+            const index1 = parseInt(document.getElementById('shape1').value);
+            const index2 = parseInt(document.getElementById('shape2').value);
+            const result = document.getElementById('comparison-result');
+            
+            if (index1 === index2) {
+                result.textContent = 'Please select different shapes to compare.';
+                result.style.color = 'black';
+                return;
+            }
+            
+            // Basic comparison based on multiple metrics
+            const shape1 = shapes[index1];
+            const shape2 = shapes[index2];
+            
+            // Check if they have the same surface area and connectivity
+            const sameArea = shape1.surfaceArea === shape2.surfaceArea;
+            const sameConn = shape1.connectivity === shape2.connectivity;
+            const sameDimensions = shape1.dimensions === shape2.dimensions || 
+                                  isPossibleRotation(shape1.dimensions, shape2.dimensions);
+            
+            // Check if they have the same number of cubes in each direction
+            const directions1 = countDirections(shape1.cubes);
+            const directions2 = countDirections(shape2.cubes);
+            const sameDirections = compareDirections(directions1, directions2);
+            
+            if (sameArea && sameConn && sameDirections) {
+                result.textContent = 'HIGH PROBABILITY these shapes are duplicates! ';
+                result.innerHTML += '<br>Surface area, connectivity and directional counts match.';
+                result.style.color = 'red';
+                
+                // Highlight the buttons for these shapes
+                document.querySelectorAll('.shape-button').forEach(btn => {
+                    const btnIndex = parseInt(btn.getAttribute('data-index'));
+                    if (btnIndex === index1 || btnIndex === index2) {
+                        btn.classList.add('matched');
+                    }
+                });
+            } else {
+                result.textContent = 'Shapes appear to be different.';
+                result.style.color = 'green';
+                result.innerHTML += '<br>Matches: ';
+                if (sameArea) result.innerHTML += 'Surface area ✓ ';
+                if (sameConn) result.innerHTML += 'Connectivity ✓ ';
+                if (sameDirections) result.innerHTML += 'Directional counts ✓ ';
+                if (sameDimensions) result.innerHTML += 'Compatible dimensions ✓';
+            }
+        }
+        
+        function isPossibleRotation(dim1, dim2) {
+            // Parse dimensions like '3×2×2' into [3,2,2]
+            const d1 = dim1.split('×').map(Number).sort();
+            const d2 = dim2.split('×').map(Number).sort();
+            
+            // Check if sorted dimensions match
+            return d1[0] === d2[0] && d1[1] === d2[1] && d1[2] === d2[2];
+        }
+        
+        function countDirections(cubes) {
+            // Count connections in each direction
+            const dirs = { px: 0, nx: 0, py: 0, ny: 0, pz: 0, nz: 0 };
+            cubes.forEach(cube => {
+                // Check if there's a cube in each direction
+                let hasNeighbor = false;
+                
+                // +X direction
+                hasNeighbor = cubes.some(c => c.x === cube.x + 1 && c.y === cube.y && c.z === cube.z);
+                if (!hasNeighbor) dirs.px++;
+                
+                // -X direction
+                hasNeighbor = cubes.some(c => c.x === cube.x - 1 && c.y === cube.y && c.z === cube.z);
+                if (!hasNeighbor) dirs.nx++;
+                
+                // +Y direction
+                hasNeighbor = cubes.some(c => c.x === cube.x && c.y === cube.y + 1 && c.z === cube.z);
+                if (!hasNeighbor) dirs.py++;
+                
+                // -Y direction
+                hasNeighbor = cubes.some(c => c.x === cube.x && c.y === cube.y - 1 && c.z === cube.z);
+                if (!hasNeighbor) dirs.ny++;
+                
+                // +Z direction
+                hasNeighbor = cubes.some(c => c.x === cube.x && c.y === cube.y && c.z === cube.z + 1);
+                if (!hasNeighbor) dirs.pz++;
+                
+                // -Z direction
+                hasNeighbor = cubes.some(c => c.x === cube.x && c.y === cube.y && c.z === cube.z - 1);
+                if (!hasNeighbor) dirs.nz++;
+            });
+            return dirs;
+        }
+        
+        function compareDirections(dirs1, dirs2) {
+            // Get all direction counts as arrays (sorted)
+            const arr1 = [dirs1.px, dirs1.nx, dirs1.py, dirs1.ny, dirs1.pz, dirs1.nz].sort();
+            const arr2 = [dirs2.px, dirs2.nx, dirs2.py, dirs2.ny, dirs2.pz, dirs2.nz].sort();
+            
+            // Compare sorted arrays
+            for (let i = 0; i < arr1.length; i++) {
+                if (arr1[i] !== arr2[i]) return false;
+            }
+            return true;
+        }
+        
+        function onWindowResize() {
+            camera.aspect = document.getElementById('viewer').clientWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(document.getElementById('viewer').clientWidth, window.innerHeight);
+        }
+        
+        function setView(x, y, z) {
+            // Calculate position based on angles
+            const distance = Math.sqrt(camera.position.x ** 2 + camera.position.y ** 2 + camera.position.z ** 2);
+            camera.position.x = distance * Math.sin(x) * Math.cos(y);
+            camera.position.y = distance * Math.sin(y);
+            camera.position.z = distance * Math.cos(x) * Math.cos(y);
+            camera.lookAt(0, 0, 0);
+            
+            // Reset controls target and update
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Apply auto-rotation if enabled
+            if (autoRotate && currentShape) {
+                currentShape.rotation.y += rotationSpeed;
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize the scene
+        function init() {
+            // Initialize Three.js scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            
+            camera = new THREE.PerspectiveCamera(75, 
+                document.getElementById('viewer').clientWidth / window.innerHeight, 
+                0.1, 1000);
+            camera.position.set(5, 5, 5);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(document.getElementById('viewer').clientWidth, window.innerHeight);
+            document.getElementById('viewer').appendChild(renderer.domElement);
+            
+            // Add OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 2, 3);
+            scene.add(directionalLight);
+            
+            // Add grid helper for reference
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+            
+            // Set up window resize handler
+            window.addEventListener('resize', onWindowResize);
+            
+            // Set up event handlers
+            setupEventHandlers();
+            
+            // Start animation loop
+            animate();
+        }
+        
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+        
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+                showError('Please upload a CSV file');
+                return;
+            }
+            
+            showLoading();
+            clearError();
+            
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: handleParsedData,
+                error: function(error) {
+                    showError('Error parsing CSV: ' + error.message);
+                    hideLoading();
+                }
+            });
+        }
+        
+        function handleParsedData(results) {
+            // Check if we have valid data
+            if (results.errors.length > 0) {
+                showError('Error parsing CSV: ' + results.errors[0].message);
+                hideLoading();
+                return;
+            }
+            
+            if (results.data.length === 0) {
+                showError('CSV file contains no data');
+                hideLoading();
+                return;
+            }
+            
+            // Check if we have the expected columns
+            const requiredColumns = ['ID', 'ShapeType', 'DimensionX', 'DimensionY', 'DimensionZ', 'CubeX', 'CubeY', 'CubeZ'];
+            const missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
+            
+            if (missingColumns.length > 0) {
+                showError('Missing required columns: ' + missingColumns.join(', '));
+                hideLoading();
+                return;
+            }
+            
+            // Process the data
+            processPolycubeData(results.data);
+            hideLoading();
+            
+            // Show UI elements that should be visible after loading data
+            document.getElementById('filter-section').classList.remove('hide');
+            document.getElementById('color-section').classList.remove('hide');
+            document.getElementById('stats-section').classList.remove('hide');
+            document.getElementById('comparison-section').classList.remove('hide');
+            document.getElementById('active-shape-info').classList.remove('hide');
+            document.getElementById('view-controls').classList.remove('hide');
+            
+            showSuccess(`Loaded ${shapesByID.size} polycubes successfully!`);
+        }
+        
+        function processPolycubeData(data) {
+            // Clear existing shapes
+            shapes = [];
+            shapesByID = new Map();
+            
+            // Group data by ID
+            data.forEach(row => {
+                if (!shapesByID.has(row.ID)) {
+                    shapesByID.set(row.ID, {
+                        id: row.ID,
+                        shapeType: row.ShapeType,
+                        dimensions: `${row.DimensionX}×${row.DimensionY}×${row.DimensionZ}`,
+                        dimensionX: row.DimensionX,
+                        dimensionY: row.DimensionY,
+                        dimensionZ: row.DimensionZ,
+                        surfaceArea: row.SurfaceArea,
+                        connectivity: row.Connectivity,
+                        cubes: []
+                    });
+                }
+                
+                const shape = shapesByID.get(row.ID);
+                shape.cubes.push({
+                    x: row.CubeX,
+                    y: row.CubeY,
+                    z: row.CubeZ
+                });
+            });
+            
+            // Convert map to array
+            shapes = Array.from(shapesByID.values());
+            
+            // Create UI
+            createCategoryUI();
+            updateStatistics();
+            populateDropdowns();
+            
+            // Load the first shape
+            if (shapes.length > 0) {
+                loadShape(0);
+            }
+        }
+        
+        function createCategoryUI() {
+            const categoriesContainer = document.getElementById('shape-categories');
+            categoriesContainer.innerHTML = '';
+            
+            // Group shapes by category
+            const categories = {
+                'Linear': [],
+                'Flat': [],
+                '3D': []
+            };
+            
+            shapes.forEach((shape, index) => {
+                const category = shape.shapeType;
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push({shape, index});
+            });
+            
+            // Create UI for each category
+            Object.keys(categories).forEach(category => {
+                const shapes = categories[category];
+                if (shapes.length === 0) return;
+                
+                const categoryClass = category.toLowerCase().replace(/\s+/g, '-');
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.setAttribute('data-category', categoryClass);
+                
+                const categoryTitle = document.createElement('div');
+                categoryTitle.className = 'category-title';
+                categoryTitle.textContent = `${getCategoryFullName(category)} (${shapes.length})`;
+                categoryTitle.addEventListener('click', function() {
+                    const shapesDiv = this.nextElementSibling;
+                    shapesDiv.style.display = shapesDiv.style.display === 'none' ? 'block' : 'none';
+                });
+                
+                const shapesDiv = document.createElement('div');
+                shapesDiv.className = 'category-shapes';
+                
+                shapes.forEach(({shape, index}) => {
+                    const button = document.createElement('button');
+                    button.className = 'shape-button';
+                    button.setAttribute('data-index', index);
+                    button.setAttribute('data-category', category);
+                    button.textContent = `Shape #${shape.id} (${shape.dimensions})`;
+                    
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        loadShape(index);
+                        
+                        // Update active button
+                        document.querySelectorAll('.shape-button').forEach(btn => btn.classList.remove('current'));
+                        button.classList.add('current');
+                    });
+                    
+                    shapesDiv.appendChild(button);
+                });
+                
+                categoryDiv.appendChild(categoryTitle);
+                categoryDiv.appendChild(shapesDiv);
+                categoriesContainer.appendChild(categoryDiv);
+            });
+        }
+        
+        function getCategoryFullName(category) {
+            switch (category) {
+                case 'Linear': return '1D (Linear)';
+                case 'Flat': return '2D (Planar)';
+                case '3D': return '3D Shapes';
+                default: return category;
+            }
+        }
+        
+        function updateStatistics() {
+            const totalCount = document.getElementById('total-count');
+            const shapeDistribution = document.getElementById('shape-distribution');
+            
+            totalCount.textContent = `Total Polycubes: ${shapes.length}`;
+            
+            // Count by category
+            const categoryCounts = {
+                'Linear': 0,
+                'Flat': 0,
+                '3D': 0
+            };
+            
+            shapes.forEach(shape => {
+                categoryCounts[shape.shapeType]++;
+            });
+            
+            // Display distribution
+            shapeDistribution.innerHTML = '';
+            Object.keys(categoryCounts).forEach(category => {
+                const count = categoryCounts[category];
+                if (count > 0) {
+                    const div = document.createElement('div');
+                    div.textContent = `${getCategoryFullName(category)}: ${count} (${(count / shapes.length * 100).toFixed(1)}%)`;
+                    shapeDistribution.appendChild(div);
+                }
+            });
+        }
+        
+        function populateDropdowns() {
+            const dropdown1 = document.getElementById('shape1');
+            const dropdown2 = document.getElementById('shape2');
+            dropdown1.innerHTML = '';
+            dropdown2.innerHTML = '';
+            
+            shapes.forEach((shape, index) => {
+                const option1 = document.createElement('option');
+                option1.value = index;
+                option1.textContent = `Shape #${shape.id} (${shape.dimensions})`;
+                dropdown1.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = index;
+                option2.textContent = `Shape #${shape.id} (${shape.dimensions})`;
+                dropdown2.appendChild(option2);
+            });
+            
+            // Set default second shape
+            if (shapes.length > 1) dropdown2.value = 1;
+        }
+        
+        function setupEventHandlers() {
+            // Set up file upload handlers
+            const dropArea = document.getElementById('drop-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadButton = document.getElementById('upload-button');
+            
+            uploadButton.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Set up drag and drop handlers
+            dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropArea.classList.add('dragover');
+            });
+            
+            dropArea.addEventListener('dragleave', () => {
+                dropArea.classList.remove('dragover');
+            });
+            
+            dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropArea.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+            
+            // View control handlers
+            document.getElementById('view-top').addEventListener('click', () => setView(0, Math.PI/2, 0));
+            document.getElementById('view-front').addEventListener('click', () => setView(0, 0, 0));
+            document.getElementById('view-right').addEventListener('click', () => setView(Math.PI/2, 0, 0));
+            document.getElementById('view-bottom').addEventListener('click', () => setView(0, -Math.PI/2, 0));
+            document.getElementById('view-back').addEventListener('click', () => setView(Math.PI, 0, 0));
+            document.getElementById('view-left').addEventListener('click', () => setView(-Math.PI/2, 0, 0));
+            document.getElementById('view-iso').addEventListener('click', () => setView(Math.PI/4, Math.PI/5, 0));
+            
+            document.getElementById('rotation-speed').addEventListener('input', function() {
+                rotationSpeed = parseInt(this.value) / 100;
+            });
+            
+            document.getElementById('auto-rotate').addEventListener('change', function() {
+                autoRotate = this.checked;
+            });
+            
+            // Color picker
+            document.getElementById('color-picker').addEventListener('input', function() {
+                cubeColor = parseInt(this.value.substring(1), 16);
+                // If a shape is currently displayed, update its color
+                if (currentShape) {
+                    currentShape.traverse(child => {
+                        if (child instanceof THREE.Mesh && child.material && !(child instanceof THREE.LineSegments)) {
+                            child.material.color.set(cubeColor);
+                        }
+                    });
+                }
+            });
+            
+            // Set up category filter and search
+            document.getElementById('category-filter').addEventListener('change', filterShapes);
+            document.getElementById('search-box').addEventListener('input', filterShapes);
+            
+            // Set up comparison button
+            document.getElementById('compare-btn').addEventListener('click', compareShapes);
+        }
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
