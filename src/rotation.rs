@@ -2,6 +2,7 @@ use crate::polycube::{Polycube, Pos};
 
 // Apply a rotation matrix to this polycube
 impl Polycube {
+    #[inline]
     pub fn apply_rotation(&self, rotation: &[[i8; 3]; 3]) -> Self {
         let new_cubes = self.cubes.iter().map(|p| {
             let x = rotation[0][0] * p.x + rotation[0][1] * p.y + rotation[0][2] * p.z;
@@ -49,7 +50,7 @@ impl Polycube {
 // Generate all 24 rotations of a polycube
 pub fn all_rotations(polycube: &Polycube) -> Vec<Polycube> {
     let rotation_matrices = generate_rotation_matrices();
-    let mut rotations = Vec::new();
+    let mut rotations = Vec::with_capacity(24);
     
     for rotation in &rotation_matrices {
         let rotated = polycube.apply_rotation(rotation);
@@ -61,7 +62,7 @@ pub fn all_rotations(polycube: &Polycube) -> Vec<Polycube> {
 
 // Generate all 24 rotation matrices
 pub fn generate_rotation_matrices() -> Vec<[[i8; 3]; 3]> {
-    let mut matrices = Vec::new();
+    let mut matrices = Vec::with_capacity(24);
     
     // +X face rotations
     matrices.push([[1, 0, 0], [0, 1, 0], [0, 0, 1]]);

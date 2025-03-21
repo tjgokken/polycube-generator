@@ -1,7 +1,8 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
-use std::collections::HashSet;
 use std::cmp::Ordering;
+
+use rustc_hash::FxHashSet;
 
 use crate::polycube::{Polycube, Pos};
 use crate::generator::get_known_count;
@@ -223,7 +224,7 @@ fn calculate_metrics(polycube: &Polycube) -> PolycubeMetrics {
     let is_flat = dimension_x == 1 || dimension_y == 1 || dimension_z == 1;
     
     // Calculate surface area (count of exposed faces)
-    let positions: HashSet<_> = polycube.cubes.iter().cloned().collect();
+    let positions: FxHashSet<_> = polycube.cubes.iter().copied().collect();
     let mut surface_area = 0;
     
     for pos in &positions {
@@ -336,7 +337,7 @@ fn polycube_to_string(polycube: &Polycube) -> String {
     let max_z = polycube.cubes.iter().map(|p| p.z).max().unwrap();
     
     // Convert to a set for quick lookup
-    let positions: HashSet<_> = polycube.cubes.iter().cloned().collect();
+    let positions: FxHashSet<_> = polycube.cubes.iter().copied().collect();
     
     // Create ASCII representation
     let mut result = String::new();

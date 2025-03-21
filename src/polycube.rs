@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use serde::{Serialize, Deserialize};
+use smallvec::{smallvec, SmallVec};
 
 // 3D coordinate type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -10,13 +11,15 @@ pub struct Pos {
 }
 
 impl Pos {
+    #[inline]
     pub fn new(x: i8, y: i8, z: i8) -> Self {
         Pos { x, y, z }
     }
 
     // Get face-adjacent positions
-    pub fn adjacent_positions(&self) -> Vec<Pos> {
-        vec![
+    #[inline]
+    pub fn adjacent_positions(&self) -> SmallVec<[Pos; 6]> {
+        smallvec![
             Pos::new(self.x + 1, self.y, self.z),
             Pos::new(self.x - 1, self.y, self.z),
             Pos::new(self.x, self.y + 1, self.z),
@@ -39,9 +42,9 @@ impl Polycube {
     }
 
     // Get all possible positions to expand this polycube
-    pub fn get_expansion_positions(&self) -> HashSet<Pos> {
-        let mut expansion_positions = HashSet::new();
-        let current_positions: HashSet<Pos> = self.cubes.iter().cloned().collect();
+    pub fn get_expansion_positions(&self) -> FxHashSet<Pos> {
+        let mut expansion_positions = FxHashSet::default();
+        let current_positions: FxHashSet<Pos> = self.cubes.iter().copied().collect();
 
         for &cube in &self.cubes {
             for adj in cube.adjacent_positions() {
@@ -84,9 +87,9 @@ impl Polycube {
             return true;
         }
 
-        let mut visited = HashSet::new();
-        let mut queue = Vec::new();
-        let positions: HashSet<Pos> = self.cubes.iter().cloned().collect();
+        let mut visited = FxHashSet::default();
+        let mut queue = Vec::with_capacity(self.cubes.len());
+        let positions: FxHashSet<Pos> = self.cubes.iter().copied().collect();
 
         // Start with first cube
         queue.push(self.cubes[0]);

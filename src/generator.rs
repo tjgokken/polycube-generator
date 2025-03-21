@@ -1,9 +1,9 @@
-use std::collections::HashSet;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Write, Read};
 use std::path::Path;
 use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
 
+use rustc_hash::FxHashSet;
 use rayon::prelude::*;
 
 use crate::polycube::Polycube;
@@ -19,10 +19,10 @@ pub fn generate_polycubes(n: u8, use_cache: bool) -> Vec<Polycube> {
     }
 
     // Check cache file
-    let cache_path = format!("cubes_{}.bincode", n);
+    let cache_path = format!("cubes_{}.zst", n);
     if use_cache && Path::new(&cache_path).exists() {
         println!("Loading polycubes n={} from cache", n);
-        match bincode::deserialize_from::<_, Vec<Polycube>>(std::fs::File::open(&cache_path).unwrap()) {
+        match load_from_cache(&cache_path) {
             Ok(polycubes) => {
                 println!("Loaded {} shapes", polycubes.len());
                 return polycubes;
@@ -37,7 +37,7 @@ pub fn generate_polycubes(n: u8, use_cache: bool) -> Vec<Polycube> {
     let base_cubes = generate_polycubes(n - 1, use_cache);
     
     // Empty list of new n-polycubes
-    let unique_forms = Mutex::new(HashSet::<String>::new());
+    let unique_forms = Mutex::new(FxHashSet::default());
     
     let total = base_cubes.len();
     println!("Processing {} base polycubes of size {}", total, n-1);
@@ -92,11 +92,43 @@ pub fn generate_polycubes(n: u8, use_cache: bool) -> Vec<Polycube> {
     // Cache results
     if use_cache {
         println!("Saving to cache...");
-        let file = File::create(&cache_path).unwrap();
-        bincode::serialize_into(file, &polycubes).unwrap();
+        match save_to_cache(&polycubes, &cache_path) {
+            Ok(_) => println!("Saved to cache successfully"),
+            Err(e) => println!("Error saving to cache: {}", e)
+        }
     }
     
     polycubes
+}
+
+// Save polycubes to compressed cache
+fn save_to_cache(polycubes: &[Polycube], path: &str) -> Result<(), std::io::Error> {
+    let serialized = bincode::serialize(polycubes)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    
+    // Create a file with zstd encoder
+    let file = File::create(path)?;
+    let mut encoder = zstd::Encoder::new(file, 3)?;
+    
+    // Write the serialized data
+    encoder.write_all(&serialized)?;
+    
+    // Finish the compression
+    encoder.finish()?;
+    
+    Ok(())
+}
+
+// Load polycubes from compressed cache
+fn load_from_cache(path: &str) -> Result<Vec<Polycube>, std::io::Error> {
+    let file = File::open(path)?;
+    let mut decoder = zstd::Decoder::new(file)?;
+    
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+    
+    bincode::deserialize(&decompressed)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
 
 // Known counts for validation
