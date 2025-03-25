@@ -1,4 +1,6 @@
 use crate::polycube::{Polycube, Pos};
+use rustc_hash::FxHasher;
+use std::hash::{Hash, Hasher};
 
 // Apply a rotation matrix to this polycube
 impl Polycube {
@@ -14,15 +16,16 @@ impl Polycube {
         Self::new(new_cubes)
     }
 
-    // Get canonical form for uniqueness testing
-    pub fn get_canonical_form(&self) -> String {
+    // Get canonical form hash for uniqueness testing
+    // Returns a 64-bit hash of the canonicalized polycube
+    pub fn get_canonical_hash(&self) -> u64 {
         let rotations = all_rotations(self);
         
-        // Find the lexicographically smallest representation
-        let mut smallest: Option<String> = None;
+        // Find the lexicographically smallest rotation
+        let mut smallest: Option<Vec<Pos>> = None;
         
         for rotation in &rotations {
-            // Generate string representation
+            // Sort positions for consistent ordering
             let mut positions: Vec<_> = rotation.cubes.clone();
             positions.sort_by(|a, b| {
                 match a.x.cmp(&b.x) {
@@ -34,17 +37,50 @@ impl Polycube {
                 }
             });
             
-            let representation: String = positions.iter()
-                .map(|pos| format!("{},{},{};", pos.x, pos.y, pos.z))
-                .collect();
-            
-            if smallest.is_none() || representation < smallest.clone().unwrap() {
-                smallest = Some(representation);
+            // If this is the first rotation or it's smaller than the current smallest
+            if smallest.is_none() || lexicographically_smaller(&positions, smallest.as_ref().unwrap()) {
+                smallest = Some(positions);
             }
         }
         
-        smallest.unwrap()
+        // Compute a 64-bit hash of the canonical form
+        let canonical_positions = smallest.unwrap();
+        let mut hasher = FxHasher::default();
+        canonical_positions.hash(&mut hasher);
+        hasher.finish()
+    }   
+}
+
+// Helper function to compare position vectors lexicographically
+#[inline]
+fn lexicographically_smaller(a: &[Pos], b: &[Pos]) -> bool {
+    let len = a.len().min(b.len());
+    
+    for i in 0..len {
+        // Compare x coordinates
+        match a[i].x.cmp(&b[i].x) {
+            std::cmp::Ordering::Less => return true,
+            std::cmp::Ordering::Greater => return false,
+            _ => {}
+        }
+        
+        // If x is equal, compare y
+        match a[i].y.cmp(&b[i].y) {
+            std::cmp::Ordering::Less => return true,
+            std::cmp::Ordering::Greater => return false,
+            _ => {}
+        }
+        
+        // If y is equal, compare z
+        match a[i].z.cmp(&b[i].z) {
+            std::cmp::Ordering::Less => return true,
+            std::cmp::Ordering::Greater => return false,
+            _ => {}
+        }
     }
+    
+    // If all compared elements are equal, the shorter array is lexicographically smaller
+    a.len() < b.len()
 }
 
 // Generate all 24 rotations of a polycube

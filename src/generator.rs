@@ -36,8 +36,8 @@ pub fn generate_polycubes(n: u8, use_cache: bool) -> Vec<Polycube> {
     // Get base polycubes (n-1)
     let base_cubes = generate_polycubes(n - 1, use_cache);
     
-    // Empty list of new n-polycubes
-    let unique_forms = Mutex::new(FxHashSet::default());
+    // Empty set of unique hash codes for fast checking
+    let unique_hashes = Mutex::new(FxHashSet::default());
     
     let total = base_cubes.len();
     println!("Processing {} base polycubes of size {}", total, n-1);
@@ -63,19 +63,19 @@ pub fn generate_polycubes(n: u8, use_cache: bool) -> Vec<Polycube> {
             // Normalize
             let normalized = expanded_shape.normalize();
             
-            // Get canonical form and check for uniqueness
-            let canonical = normalized.get_canonical_form();
+            // Get canonical hash for uniqueness check (much faster than string representation)
+            let canonical_hash = normalized.get_canonical_hash();
             
             // Try to add to global uniqueness set
-            let mut unique_forms_guard = unique_forms.lock().unwrap();
-            if unique_forms_guard.insert(canonical) {
+            let mut unique_hashes_guard = unique_hashes.lock().unwrap();
+            if unique_hashes_guard.insert(canonical_hash) {
                 local_polycubes.push(normalized);
             }
         }
         
         // Update progress
         let idx = progress.fetch_add(1, Ordering::SeqCst);
-        if idx % 100 == 0 {
+        if idx % 100 == 0 || idx == total - 1 {
             print!("\rGenerating polycubes n={}: {:.1}%", n, (idx as f32 / total as f32) * 100.0);
             let _ = std::io::stdout().flush();
         }
